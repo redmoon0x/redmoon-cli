@@ -1,0 +1,3 @@
+[submodule "packages/aether-mcp"]
+	path = packages/aether-mcp
+	url = https://github.com/deviprasadshetty-dev/Aether.git

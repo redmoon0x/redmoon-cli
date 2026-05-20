@@ -17,7 +17,6 @@ import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   resetGeminiMdFilename,
-  DEFAULT_CONTEXT_FILENAME,
   ApprovalMode,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -46,6 +45,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  getActiveProviderConfig,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -164,9 +164,9 @@ export async function parseArguments(
   const startupMessages: string[] = [];
   const yargsInstance = yargs(rawArgv)
     .locale('en')
-    .scriptName('gemini')
+    .scriptName('redmoon')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
+      'Usage: redmoon [options] [command]\n\nRedmoon CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
     .option('isCommand', {
       type: 'boolean',
@@ -278,7 +278,7 @@ export async function parseArguments(
   yargsInstance.command(gemmaCommand);
 
   yargsInstance
-    .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [query..]', 'Launch Redmoon CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
           description:
@@ -314,7 +314,7 @@ export async function parseArguments(
           type: 'string',
           skipValidation: true,
           description:
-            'Start Gemini in a new git worktree. If no name is provided, one is generated automatically.',
+            'Start Redmoon in a new git worktree. If no name is provided, one is generated automatically.',
           coerce: (value: unknown): string => {
             const trimmed = typeof value === 'string' ? value.trim() : '';
             if (trimmed === '') {
@@ -617,7 +617,7 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(settings.context.fileName);
   } else {
     // Reset to default if not provided in settings.
-    resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    resetGeminiMdFilename();
   }
 
   const fileService = new FileDiscoveryService(cwd);
@@ -833,8 +833,12 @@ export async function loadCliConfig(
   );
 
   const defaultModel = GEMINI_MODEL_ALIAS_AUTO;
+  const activeProviderModel = getActiveProviderConfig()?.model;
   const rawModel =
-    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+    argv.model ||
+    process.env['GEMINI_MODEL'] ||
+    activeProviderModel ||
+    settings.model?.name;
 
   // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
   const specifiedModel = Array.isArray(rawModel)

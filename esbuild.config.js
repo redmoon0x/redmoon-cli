@@ -125,26 +125,6 @@ const workerConfig = {
   alias: commonAliases,
 };
 
-const a2aServerConfig = {
-  ...baseConfig,
-  banner: {
-    js: `const require = (await import('node:module')).createRequire(import.meta.url); const __chunk_filename = (await import('node:url')).fileURLToPath(import.meta.url); const __chunk_dirname = (await import('node:path')).dirname(__chunk_filename);`,
-  },
-  entryPoints: ['packages/a2a-server/src/http/server.ts'],
-  outfile: 'packages/a2a-server/dist/a2a-server.mjs',
-  define: {
-    __filename: '__chunk_filename',
-    __dirname: '__chunk_dirname',
-    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
-    'process.env.NODE_ENV': JSON.stringify(
-      process.env.NODE_ENV || 'production',
-    ),
-    'process.env.DEV': JSON.stringify(process.env.DEV || 'false'),
-  },
-  plugins: createWasmPlugins(),
-  alias: commonAliases,
-};
-
 Promise.allSettled([
   esbuild.build(cliConfig).then(({ metafile }) => {
     if (process.env.DEV === 'true') {
@@ -152,9 +132,8 @@ Promise.allSettled([
     }
   }),
   esbuild.build(workerConfig),
-  esbuild.build(a2aServerConfig),
 ]).then((results) => {
-  const [cliResult, workerResult, a2aResult] = results;
+  const [cliResult, workerResult] = results;
   if (cliResult.status === 'rejected') {
     console.error('gemini.js build failed:', cliResult.reason);
     process.exit(1);
@@ -162,9 +141,5 @@ Promise.allSettled([
   if (workerResult.status === 'rejected') {
     console.error('worker-entry.js build failed:', workerResult.reason);
     process.exit(1);
-  }
-  // error in a2a-server bundling will not stop gemini.js bundling process
-  if (a2aResult.status === 'rejected') {
-    console.warn('a2a-server build failed:', a2aResult.reason);
   }
 });

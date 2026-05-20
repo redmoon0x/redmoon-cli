@@ -13,6 +13,7 @@ import {
   CoreEvent,
   FatalConfigError,
   GEMINI_DIR,
+  LEGACY_GEMINI_DIR,
   getErrorMessage,
   getFsErrorMessage,
   Storage,
@@ -79,6 +80,11 @@ export function getMergeStrategyForPath(
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
+const LEGACY_USER_SETTINGS_PATH = path.join(
+  homedir(),
+  LEGACY_GEMINI_DIR,
+  'settings.json',
+);
 export const DEFAULT_EXCLUDED_ENV_VARS = [
   'DEBUG',
   'DEBUG_MODE',
@@ -102,21 +108,33 @@ export function sanitizeEnvVar(value: string): string {
 }
 
 export function getSystemSettingsPath(): string {
-  if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
-    return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
+  if (
+    process.env['REDMOON_CLI_SYSTEM_SETTINGS_PATH'] ||
+    process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']
+  ) {
+    return (
+      process.env['REDMOON_CLI_SYSTEM_SETTINGS_PATH'] ??
+      process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']!
+    );
   }
   if (platform() === 'darwin') {
-    return '/Library/Application Support/GeminiCli/settings.json';
+    return '/Library/Application Support/RedmoonCli/settings.json';
   } else if (platform() === 'win32') {
-    return 'C:\\ProgramData\\gemini-cli\\settings.json';
+    return 'C:\\ProgramData\\redmoon-cli\\settings.json';
   } else {
-    return '/etc/gemini-cli/settings.json';
+    return '/etc/redmoon-cli/settings.json';
   }
 }
 
 export function getSystemDefaultsPath(): string {
-  if (process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']) {
-    return process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH'];
+  if (
+    process.env['REDMOON_CLI_SYSTEM_DEFAULTS_PATH'] ||
+    process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']
+  ) {
+    return (
+      process.env['REDMOON_CLI_SYSTEM_DEFAULTS_PATH'] ??
+      process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']!
+    );
   }
   return path.join(
     path.dirname(getSystemSettingsPath()),
@@ -730,6 +748,21 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
+  const legacyWorkspaceSettingsPath = path.join(
+    workspaceDir,
+    LEGACY_GEMINI_DIR,
+    'settings.json',
+  );
+
+  const selectReadableSettingsPath = (
+    primaryPath: string,
+    legacyPath: string,
+  ): string => {
+    if (!fs.existsSync(primaryPath) && fs.existsSync(legacyPath)) {
+      return legacyPath;
+    }
+    return primaryPath;
+  };
 
   const load = (
     filePath: string,
@@ -801,7 +834,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   const systemResult = load(systemSettingsPath);
   const systemDefaultsResult = load(systemDefaultsPath);
-  const userResult = load(USER_SETTINGS_PATH);
+  const userSettingsPath = selectReadableSettingsPath(
+    USER_SETTINGS_PATH,
+    LEGACY_USER_SETTINGS_PATH,
+  );
+  const userResult = load(userSettingsPath);
 
   let workspaceResult: {
     settings: Settings;
@@ -812,8 +849,13 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     rawSettings: {} as Settings,
     rawJson: undefined,
   };
+  let selectedWorkspaceSettingsPath = workspaceSettingsPath;
   if (!storage.isWorkspaceHomeDir()) {
-    workspaceResult = load(workspaceSettingsPath);
+    selectedWorkspaceSettingsPath = selectReadableSettingsPath(
+      workspaceSettingsPath,
+      legacyWorkspaceSettingsPath,
+    );
+    workspaceResult = load(selectedWorkspaceSettingsPath);
   }
 
   const systemOriginalSettings = structuredClone(systemResult.rawSettings);
@@ -895,14 +937,14 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
       readOnly: true,
     },
     {
-      path: USER_SETTINGS_PATH,
+      path: userSettingsPath,
       settings: userSettings,
       originalSettings: userOriginalSettings,
       rawJson: userResult.rawJson,
       readOnly: false,
     },
     {
-      path: storage.isWorkspaceHomeDir() ? '' : workspaceSettingsPath,
+      path: storage.isWorkspaceHomeDir() ? '' : selectedWorkspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,

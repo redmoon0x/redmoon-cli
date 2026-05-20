@@ -14,6 +14,7 @@ import {
 import { processImports } from './memoryImportProcessor.js';
 import {
   GEMINI_DIR,
+  LEGACY_GEMINI_DIR,
   homedir,
   isSubpath,
   normalizePath,
@@ -317,22 +318,25 @@ export interface MemoryLoadResult {
 export async function getGlobalMemoryPaths(): Promise<string[]> {
   const userHome = homedir();
   const geminiMdFilenames = getAllGeminiMdFilenames();
+  const configDirs = Array.from(new Set([GEMINI_DIR, LEGACY_GEMINI_DIR]));
 
-  const accessChecks = geminiMdFilenames.map(async (filename) => {
-    const globalPath = toAbsolutePath(
-      path.join(userHome, GEMINI_DIR, filename),
-    );
-    try {
-      await fs.access(globalPath, fsSync.constants.R_OK);
-      debugLogger.debug(
-        '[DEBUG] [MemoryDiscovery] Found global memory file:',
-        globalPath,
+  const accessChecks = configDirs.flatMap((configDir) =>
+    geminiMdFilenames.map(async (filename) => {
+      const globalPath = toAbsolutePath(
+        path.join(userHome, configDir, filename),
       );
-      return globalPath;
-    } catch {
-      return null;
-    }
-  });
+      try {
+        await fs.access(globalPath, fsSync.constants.R_OK);
+        debugLogger.debug(
+          '[DEBUG] [MemoryDiscovery] Found global memory file:',
+          globalPath,
+        );
+        return globalPath;
+      } catch {
+        return null;
+      }
+    }),
+  );
 
   return (await Promise.all(accessChecks)).filter(
     (p): p is string => p !== null,
@@ -468,7 +472,11 @@ async function findUpwardGeminiFiles(
   let currentDir = toAbsolutePath(startDir);
   const resolvedStopDirKey = normalizePath(stopDir);
   const geminiMdFilenames = getAllGeminiMdFilenames();
-  const globalGeminiDirKey = normalizePath(path.join(homedir(), GEMINI_DIR));
+  const globalGeminiDirKeys = new Set(
+    [GEMINI_DIR, LEGACY_GEMINI_DIR].map((dir) =>
+      normalizePath(path.join(homedir(), dir)),
+    ),
+  );
 
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Starting upward search from',
@@ -478,7 +486,7 @@ async function findUpwardGeminiFiles(
   );
 
   while (true) {
-    if (normalizePath(currentDir) === globalGeminiDirKey) {
+    if (globalGeminiDirKeys.has(normalizePath(currentDir))) {
       break;
     }
 

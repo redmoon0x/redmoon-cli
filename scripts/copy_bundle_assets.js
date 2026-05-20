@@ -54,18 +54,6 @@ for (const file of policyFiles) {
 
 console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 
-// Also copy policies to a2a-server dist directory for bundled execution
-const a2aPolicyDir = join(root, 'packages/a2a-server/dist/policies');
-if (!existsSync(a2aPolicyDir)) {
-  mkdirSync(a2aPolicyDir, { recursive: true });
-}
-for (const file of policyFiles) {
-  copyFileSync(join(root, file), join(a2aPolicyDir, basename(file)));
-}
-console.log(
-  `Copied ${policyFiles.length} policy files to packages/a2a-server/dist/policies/`,
-);
-
 // 3. Copy Documentation (docs/)
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
@@ -120,7 +108,32 @@ if (!existsSync(bundleMcpSrc)) {
 cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
 console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
 
-// 7. Copy Extension Examples
+// 7. Copy Aether MCP package so the built-in aether agent can resolve it.
+const aetherPackageSrc = join(root, 'packages/aether-mcp', 'server');
+const aetherDistSrc = join(aetherPackageSrc, 'dist');
+const aetherPackageDest = join(bundleDir, 'node_modules', 'aether-mcp-server');
+if (existsSync(aetherDistSrc)) {
+  mkdirSync(aetherPackageDest, { recursive: true });
+  cpSync(aetherDistSrc, join(aetherPackageDest, 'dist'), {
+    recursive: true,
+    dereference: true,
+  });
+  copyFileSync(
+    join(aetherPackageSrc, 'package.json'),
+    join(aetherPackageDest, 'package.json'),
+  );
+
+  const aetherNodeModulesSrc = join(aetherPackageSrc, 'node_modules');
+  if (existsSync(aetherNodeModulesSrc)) {
+    cpSync(aetherNodeModulesSrc, join(aetherPackageDest, 'node_modules'), {
+      recursive: true,
+      dereference: true,
+    });
+  }
+  console.log('Copied Aether MCP package to bundle/node_modules/');
+}
+
+// 8. Copy Extension Examples
 const extensionExamplesSrc = join(
   root,
   'packages/cli/src/commands/extensions/examples',

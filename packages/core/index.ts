@@ -50,3 +50,14 @@ export { getCodeAssistServer } from './src/code_assist/codeAssist.js';
 export { getExperiments } from './src/code_assist/experiments/experiments.js';
 export { ExperimentFlags } from './src/code_assist/experiments/flagNames.js';
 export { getErrorStatus, ModelNotFoundError } from './src/utils/httpErrors.js';
+export {
+  clearActiveProvider,
+  fetchProviderModels,
+  getActiveProviderConfig,
+  loadProviderConfigFile,
+  PROVIDER_PRESETS,
+  resolveProviderConfig,
+  setProviderConfig,
+  type ProviderConfig,
+  type ProviderId,
+} from './src/providers/providerConfig.js';

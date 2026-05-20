@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { HierarchicalMemory } from '../config/memory.js';
-import { GEMINI_DIR, makeRelative } from '../utils/paths.js';
+import { GEMINI_DIR, LEGACY_GEMINI_DIR, makeRelative } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
@@ -51,7 +51,7 @@ export class PromptProvider {
     topicUpdateNarrationOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
-      process.env['GEMINI_SYSTEM_MD'],
+      process.env['REDMOON_SYSTEM_MD'] || process.env['GEMINI_SYSTEM_MD'],
     );
 
     const interactiveMode =
@@ -112,6 +112,11 @@ export class PromptProvider {
       let systemMdPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
       if (!systemMdResolution.isSwitch) {
         systemMdPath = systemMdResolution.value;
+      } else if (
+        !fs.existsSync(systemMdPath) &&
+        fs.existsSync(path.resolve(path.join(LEGACY_GEMINI_DIR, 'system.md')))
+      ) {
+        systemMdPath = path.resolve(path.join(LEGACY_GEMINI_DIR, 'system.md'));
       }
       if (!fs.existsSync(systemMdPath)) {
         throw new Error(`missing system prompt file '${systemMdPath}'`);
@@ -323,7 +328,8 @@ export class PromptProvider {
     defaultPath: string,
   ): void {
     const writeSystemMdResolution = resolvePathFromEnv(
-      process.env['GEMINI_WRITE_SYSTEM_MD'],
+      process.env['REDMOON_WRITE_SYSTEM_MD'] ||
+        process.env['GEMINI_WRITE_SYSTEM_MD'],
     );
     if (writeSystemMdResolution.value && !writeSystemMdResolution.isDisabled) {
       const writePath = writeSystemMdResolution.isSwitch

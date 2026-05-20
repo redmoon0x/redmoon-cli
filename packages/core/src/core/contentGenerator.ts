@@ -30,6 +30,12 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import {
+  getActiveProviderConfig,
+  PROVIDER_PRESETS,
+  type ProviderConfig,
+} from '../providers/providerConfig.js';
+import { OpenAiCompatibleContentGenerator } from '../providers/openAiCompatibleContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -65,6 +71,7 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  OPENAI_COMPATIBLE = 'openai-compatible',
 }
 
 /**
@@ -105,6 +112,7 @@ export type ContentGeneratorConfig = {
   baseUrl?: string;
   customHeaders?: Record<string, string>;
   vertexAiRouting?: VertexAiRoutingConfig;
+  provider?: ProviderConfig;
 };
 
 export type VertexAiRequestType = 'dedicated' | 'shared';
@@ -142,6 +150,19 @@ export async function createContentGeneratorConfig(
     customHeaders,
     vertexAiRouting,
   };
+
+  const activeProvider = getActiveProviderConfig();
+  if (activeProvider && activeProvider.provider !== 'gemini') {
+    const preset = PROVIDER_PRESETS[activeProvider.provider];
+    contentGeneratorConfig.authType = AuthType.OPENAI_COMPATIBLE;
+    contentGeneratorConfig.provider = activeProvider;
+    contentGeneratorConfig.apiKey = activeProvider.apiKey;
+    contentGeneratorConfig.baseUrl = activeProvider.baseUrl;
+    if (!preset.openAiCompatible) {
+      throw new Error(`Provider ${activeProvider.provider} is not supported.`);
+    }
+    return contentGeneratorConfig;
+  }
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now.
   // Return before touching the API-key keychain: on Linux without a Secret Service
@@ -213,6 +234,12 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
+    if (config.authType === AuthType.OPENAI_COMPATIBLE && config.provider) {
+      return new LoggingContentGenerator(
+        new OpenAiCompatibleContentGenerator(config.provider),
+        gcConfig,
+      );
+    }
     const model = resolveModel(
       gcConfig.getModel(),
       config.authType === AuthType.USE_GEMINI ||

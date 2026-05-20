@@ -33,8 +33,10 @@ export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   customIgnoreFilePaths: [],
 };
 
-// Generic exclusion file name
-export const GEMINI_IGNORE_FILE_NAME = '.geminiignore';
+// Generic exclusion file name. Redmoon is primary; Gemini is kept as a legacy
+// fallback by FileDiscoveryService.
+export const GEMINI_IGNORE_FILE_NAME = '.redmoonignore';
+export const LEGACY_GEMINI_IGNORE_FILE_NAME = '.geminiignore';
 
 // Extension integrity constants
 export const INTEGRITY_FILENAME = 'extension_integrity.json';

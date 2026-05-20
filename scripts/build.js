@@ -30,6 +30,18 @@ if (!existsSync(join(root, 'node_modules'))) {
   execSync('npm install', { stdio: 'inherit', cwd: root });
 }
 
+try {
+  console.log('Syncing Aether MCP submodule...');
+  execSync('git submodule update --init --remote packages/aether-mcp', {
+    stdio: 'inherit',
+    cwd: root,
+  });
+} catch {
+  console.warn(
+    'Warning: Could not sync Aether MCP submodule. Continuing with the local checkout.',
+  );
+}
+
 // build all workspaces/packages
 execSync('npm run generate', { stdio: 'inherit', cwd: root });
 

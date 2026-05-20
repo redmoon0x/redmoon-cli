@@ -5,6 +5,7 @@
  */
 
 import {
+  getActiveProviderConfig,
   ModelSlashCommandEvent,
   logModelSlashCommand,
 } from '@google/gemini-cli-core';
@@ -53,7 +54,11 @@ const manageModelCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext) => {
-    if (context.services.agentContext?.config) {
+    const activeProvider = getActiveProviderConfig();
+    if (
+      context.services.agentContext?.config &&
+      (!activeProvider || activeProvider.provider === 'gemini')
+    ) {
       await context.services.agentContext.config.refreshUserQuota();
     }
     return {
@@ -65,6 +70,7 @@ const manageModelCommand: SlashCommand = {
 
 export const modelCommand: SlashCommand = {
   name: 'model',
+  altNames: ['models'],
   description: 'Manage model configuration',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,

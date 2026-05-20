@@ -10,6 +10,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import {
   GEMINI_DIR,
+  LEGACY_GEMINI_DIR,
   homedir,
   GOOGLE_ACCOUNTS_FILENAME,
   isSubpath,
@@ -59,6 +60,14 @@ export class Storage {
     return path.join(homeDir, GEMINI_DIR);
   }
 
+  static getLegacyGlobalGeminiDir(): string {
+    const homeDir = homedir();
+    if (!homeDir) {
+      return path.join(os.tmpdir(), LEGACY_GEMINI_DIR);
+    }
+    return path.join(homeDir, LEGACY_GEMINI_DIR);
+  }
+
   static getGlobalAgentsDir(): string {
     const homeDir = homedir();
     if (!homeDir) {
@@ -79,6 +88,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
 
+  static getLegacyGlobalSettingsPath(): string {
+    return path.join(Storage.getLegacyGlobalGeminiDir(), 'settings.json');
+  }
+
   static getInstallationIdPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'installation_id');
   }
@@ -88,8 +101,14 @@ export class Storage {
   }
 
   static getTrustedFoldersPath(): string {
-    if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
-      return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
+    if (
+      process.env['REDMOON_CLI_TRUSTED_FOLDERS_PATH'] ||
+      process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']
+    ) {
+      return (
+        process.env['REDMOON_CLI_TRUSTED_FOLDERS_PATH'] ??
+        process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']!
+      );
     }
     return path.join(Storage.getGlobalGeminiDir(), TRUSTED_FOLDERS_FILENAME);
   }
@@ -132,17 +151,23 @@ export class Storage {
 
   private static getSystemConfigDir(): string {
     if (os.platform() === 'darwin') {
-      return '/Library/Application Support/GeminiCli';
+      return '/Library/Application Support/RedmoonCli';
     } else if (os.platform() === 'win32') {
-      return 'C:\\ProgramData\\gemini-cli';
+      return 'C:\\ProgramData\\redmoon-cli';
     } else {
-      return '/etc/gemini-cli';
+      return '/etc/redmoon-cli';
     }
   }
 
   static getSystemSettingsPath(): string {
-    if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
-      return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
+    if (
+      process.env['REDMOON_CLI_SYSTEM_SETTINGS_PATH'] ||
+      process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']
+    ) {
+      return (
+        process.env['REDMOON_CLI_SYSTEM_SETTINGS_PATH'] ??
+        process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']!
+      );
     }
     return path.join(Storage.getSystemConfigDir(), 'settings.json');
   }
@@ -292,6 +317,10 @@ export class Storage {
 
   getWorkspaceSettingsPath(): string {
     return path.join(this.getGeminiDir(), 'settings.json');
+  }
+
+  getLegacyWorkspaceSettingsPath(): string {
+    return path.join(this.targetDir, LEGACY_GEMINI_DIR, 'settings.json');
   }
 
   getProjectCommandsDir(): string {

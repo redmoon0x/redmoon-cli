@@ -1,7 +1,7 @@
 {
   "name": "@google/gemini-cli",
   "version": "0.44.0-nightly.20260512.g022e8baef",
-  "description": "Gemini CLI",
+  "description": "Redmoon CLI",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -10,6 +10,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
+    "redmoon": "dist/index.js",
     "gemini": "dist/index.js"
   },
   "scripts": {

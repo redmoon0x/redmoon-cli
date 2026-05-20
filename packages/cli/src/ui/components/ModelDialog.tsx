@@ -27,6 +27,10 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
   getAutoModelDescription,
+  fetchProviderModels,
+  getActiveProviderConfig,
+  PROVIDER_PRESETS,
+  setProviderConfig,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -42,6 +46,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
   const { terminalWidth } = useUIState();
+  const activeProviderConfig = useMemo(() => getActiveProviderConfig(), []);
+  const isProviderModelMode =
+    activeProviderConfig !== undefined &&
+    activeProviderConfig.provider !== 'gemini';
+  const [providerModels, setProviderModels] = useState<string[]>([]);
+  const [providerModelsLoading, setProviderModelsLoading] = useState(false);
+  const [providerModelsError, setProviderModelsError] = useState<string | null>(
+    null,
+  );
   const [hasAccessToProModel, setHasAccessToProModel] = useState<boolean>(
     () => !(config?.getProModelNoAccessSync() ?? false),
   );
@@ -52,7 +65,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   useEffect(() => {
     async function checkAccess() {
-      if (!config) return;
+      if (!config || isProviderModelMode) return;
       const noAccess = await config.getProModelNoAccess();
       setHasAccessToProModel(!noAccess);
       if (noAccess) {
@@ -60,7 +73,44 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
     }
     void checkAccess();
-  }, [config]);
+  }, [config, isProviderModelMode]);
+
+  useEffect(() => {
+    if (!activeProviderConfig || !isProviderModelMode) {
+      return;
+    }
+
+    let isCancelled = false;
+    setProviderModelsLoading(true);
+    setProviderModelsError(null);
+    void fetchProviderModels(activeProviderConfig)
+      .then((models) => {
+        if (!isCancelled) {
+          setProviderModels(models);
+        }
+      })
+      .catch((e) => {
+        if (!isCancelled) {
+          setProviderModels([]);
+          setProviderModelsError(e instanceof Error ? e.message : String(e));
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setProviderModelsLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    activeProviderConfig,
+    activeProviderConfig?.apiKey,
+    activeProviderConfig?.baseUrl,
+    activeProviderConfig?.provider,
+    isProviderModelMode,
+  ]);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || GEMINI_MODEL_ALIAS_AUTO;
@@ -72,6 +122,32 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+
+  const providerModelOptions = useMemo(() => {
+    if (!activeProviderConfig) {
+      return [];
+    }
+
+    const fallbackModel = activeProviderConfig.model || config?.getModel();
+    const fetched = providerModels.map((model) => ({
+      value: model,
+      title: model,
+      key: model,
+    }));
+
+    if (
+      fallbackModel &&
+      !fetched.some((option) => option.value === fallbackModel)
+    ) {
+      fetched.unshift({
+        value: fallbackModel,
+        title: fallbackModel,
+        key: fallbackModel,
+      });
+    }
+
+    return fetched;
+  }, [activeProviderConfig, config, providerModels]);
 
   const manualModelSelected = useMemo(() => {
     if (
@@ -330,6 +406,92 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     },
     [config, onClose, persistMode],
   );
+
+  const handleProviderModelSelect = useCallback(
+    (model: string) => {
+      if (!config || !activeProviderConfig) {
+        return;
+      }
+
+      setProviderConfig({
+        ...activeProviderConfig,
+        model,
+      });
+      config.setModel(model, persistMode ? false : true);
+      const event = new ModelSlashCommandEvent(model);
+      logModelSlashCommand(config, event);
+      onClose();
+    },
+    [activeProviderConfig, config, onClose, persistMode],
+  );
+
+  if (activeProviderConfig && isProviderModelMode) {
+    const provider = PROVIDER_PRESETS[activeProviderConfig.provider];
+    const initialProviderModelIndex = Math.max(
+      0,
+      providerModelOptions.findIndex(
+        (option) => option.value === preferredModel,
+      ),
+    );
+
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        width="100%"
+      >
+        <Text bold>Select Model</Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.text.secondary}>{provider.label}</Text>
+          {providerModelsLoading && (
+            <Text color={theme.text.secondary}>
+              Fetching models from /models...
+            </Text>
+          )}
+          {providerModelsError && (
+            <Text color={theme.status.error}>{providerModelsError}</Text>
+          )}
+        </Box>
+
+        {providerModelOptions.length > 0 && (
+          <Box marginTop={1}>
+            <DescriptiveRadioButtonSelect
+              items={providerModelOptions}
+              onSelect={handleProviderModelSelect}
+              initialIndex={initialProviderModelIndex}
+              showNumbers={true}
+              showScrollArrows={true}
+              maxItemsToShow={10}
+            />
+          </Box>
+        )}
+
+        {!providerModelsLoading && providerModelOptions.length === 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text color={theme.text.secondary}>
+              No models returned. Use /model set &lt;model-name&gt; to enter one
+              manually.
+            </Text>
+          </Box>
+        )}
+
+        <Box marginTop={1} flexDirection="column">
+          <Box>
+            <Text bold color={theme.text.primary}>
+              Remember model for future sessions:{' '}
+            </Text>
+            <Text color={theme.status.success}>
+              {persistMode ? 'true' : 'false'}
+            </Text>
+            <Text color={theme.text.secondary}> (Press Tab to toggle)</Text>
+          </Box>
+          <Text color={theme.text.secondary}>(Press Esc to close)</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box
