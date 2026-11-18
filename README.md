@@ -16,7 +16,7 @@ automation, and non-runtime packages that are not needed for personal CLI use.
 - `packages/devtools` - devtools support.
 - `packages/test-utils` - shared test helpers.
 - `packages/aether-mcp` - Aether browser MCP submodule from
-  [deviprasadshetty-dev/Aether](https://github.com/deviprasadshetty-dev/Aether.git).
+  [redmoon0x/Aether](https://github.com/redmoon0x/Aether.git).
 
 ## What Changed
 
@@ -57,7 +57,7 @@ packages/aether-mcp
 The submodule points to:
 
 ```text
-https://github.com/deviprasadshetty-dev/Aether.git
+https://github.com/redmoon0x/Aether.git
 ```
 
 Build and bundle commands sync the submodule before building, so Redmoon picks
@@ -171,7 +171,7 @@ npm run redmoon -- --help
 When cloning this repo, include submodules:
 
 ```powershell
-git clone --recurse-submodules https://github.com/deviprasadshetty-dev/redmoon-cli.git
+git clone --recurse-submodules https://github.com/redmoon0x/redmoon-cli.git
 ```
 
 If already cloned:
